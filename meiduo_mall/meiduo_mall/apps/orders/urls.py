@@ -1,1 +1,1 @@
-from django.conf.urls import urlfrom orders import viewsurlpatterns = [    # 去结算    url(r'^orders/settlement/$', views.OrderSettlementView.as_view()),    # 保存订单    url(r'^orders/$', views.CommitOrderView.as_view()),]
+from django.conf.urls import urlfrom orders import viewsurlpatterns = [    # 去结算    url(r'^orders/settlement/$', views.OrderSettlementView.as_view()),    # 保存订单    url(r'^orders/$', views.CommitOrderView.as_view()),    # 用户全部订单信息    # url(r'^order/$', views.OrderDisplayView.as_view()),]

@@ -3,6 +3,7 @@ from meiduo_mall.utils.models import BaseModel
 from users.models import User, Address
 from goods.models import SKU
 
+
 # Create your models here.
 
 

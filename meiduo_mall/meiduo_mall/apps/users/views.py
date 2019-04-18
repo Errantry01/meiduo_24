@@ -28,9 +28,6 @@ class UserView(CreateAPIView):
     serializer_class = CreateUserSerializer
 
 
-
-
-
 class UsernameCountView(APIView):
     """判断用户是否已注册"""
 
@@ -212,6 +209,7 @@ class UserBrowserHistoryView(CreateAPIView):
 
         # 响应
         return Response(serializer.data)
+
 
 jwt_response_payload_handler = api_settings.JWT_RESPONSE_PAYLOAD_HANDLER
 

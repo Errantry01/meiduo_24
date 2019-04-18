@@ -4,10 +4,11 @@ from django_redis import get_redis_connection
 from rest_framework.permissions import IsAuthenticated
 from decimal import Decimal
 from rest_framework.response import Response
-from rest_framework.generics import CreateAPIView
+from rest_framework.generics import CreateAPIView, ListAPIView
 
 from goods.models import SKU
-from .serializers import OrderSettlementSerializer, CommitOrderSerializer
+from .serializers import OrderSettlementSerializer, CommitOrderSerializer, OrderInfoSerializer
+from .models import OrderInfo
 
 
 # Create your views here.
@@ -45,17 +46,30 @@ class OrderSettlementView(APIView):
         # 定义一运费
         freight = Decimal('10.00')
 
-        data_dict = {'freight': freight, 'skus': skus}  #  序列化时,可以对 单个模型/查询集/列表/字典 都可以进行序列化器()
+        data_dict = {'freight': freight, 'skus': skus}  # 序列化时,可以对 单个模型/查询集/列表/字典 都可以进行序列化器()
         # 创建序列化器进行序列化
         serializer = OrderSettlementSerializer(data_dict)
 
         return Response(serializer.data)
 
 
-class CommitOrderView(CreateAPIView):
+class CommitOrderView(CreateAPIView, ListAPIView):
     """保存订单"""
 
-    serializer_class = CommitOrderSerializer
+    # serializer_class = CommitOrderSerializer
 
     # 指定权限
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """重写指定查询集"""
+        user = self.request.user
+        orders = OrderInfo.objects.filter(user=user)
+        return orders
+
+    def get_serializer_class(self):
+        """重写指定序列化器"""
+        if self.request.method == 'POST':
+            return CommitOrderSerializer
+        else:
+            return OrderInfoSerializer
