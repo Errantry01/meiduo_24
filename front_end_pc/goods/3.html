@@ -1776,7 +1776,7 @@
                 <ul class="judge_list_con">
                     <li class="judge_list fl" v-for="comment in comments">
                         <div class="user_info fl">
-                            <b>[[comment.username]]</b>
+                            <b>[[comment.order.user.username]]</b>
                         </div>
                         <div class="judge_info fl">
                             <div :class="comment.score_class"></div>

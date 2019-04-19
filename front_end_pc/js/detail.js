@@ -79,7 +79,7 @@ var vm = new Vue({
         },
         // 添加购物车
         add_cart: function(){
-            axios.post(this.host+'/cart/', {
+            axios.post(this.host+'/carts/', {
                     sku_id: parseInt(this.sku_id),
                     count: this.sku_count
                 }, {
@@ -104,7 +104,7 @@ var vm = new Vue({
         },
         // 获取购物车数据
         get_cart: function(){
-            axios.get(this.host+'/cart/', {
+            axios.get(this.host+'/carts/', {
                     headers: {
                         'Authorization': 'JWT ' + this.token
                     },

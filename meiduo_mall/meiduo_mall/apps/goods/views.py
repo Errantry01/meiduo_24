@@ -40,12 +40,13 @@ class SKUSearchViewSet(HaystackViewSet):
 
 class SKUCommentView(APIView):
     """商品评论展示"""
+
     def get(self, request, sku_id):
-
-        order_good = OrderGoods.objects.filter(sku_id=sku_id,is_commented =1)
-        serializer = SKUCommentSerializer(data=order_good, many=True)
-        serializer.is_valid(raise_exception=True)
+        user = request.user
+        try:
+            order_good = OrderGoods.objects.filter(sku_id=sku_id, is_commented=True)
+        except OrderGoods.DoesNotExist:
+            return Response({'message': '商品有误'}, status=status.HTTP_400_BAD_REQUEST)
+        serializer = SKUCommentSerializer(order_good, many=True)
+        # serializer.is_valid(raise_exception=True)
         return Response(data=serializer.data, status=status.HTTP_200_OK)
-
-
-
