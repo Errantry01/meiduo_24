@@ -242,8 +242,6 @@ class UserAuthorizeView(ObtainJSONWebToken):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
-
 class UsernameInputView(GenericAPIView):
     """忘记密码第一步"""
 
