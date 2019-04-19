@@ -11,12 +11,14 @@ from django_redis import get_redis_connection
 from rest_framework_jwt.settings import api_settings
 from rest_framework_jwt.views import ObtainJSONWebToken
 from datetime import datetime
+import re
 
 from .serializers import CreateUserSerializer, UserDetailSerializer, EmailSerializer, UserAddressSerializer, \
-    AddressTitleSerializer, UserBrowserHistorySerializer, SKUSerializer
+    AddressTitleSerializer, UserBrowserHistorySerializer, SKUSerializer, ImageCodeCheckSerializer, SetPasswordSerializer
 from .models import User, Address
 from goods.models import SKU
 from carts.utils import merge_cart_cookie_to_redis
+from users.utils import get_user_by_account
 
 
 # Create your views here.
@@ -240,23 +242,75 @@ class UserAuthorizeView(ObtainJSONWebToken):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# class ResetPassword(APIView):
-#     """重置密码"""
-#     def post(self, request, user_id):
-#         # 根据user_id获取user对象
-#         try:
-#             user = User.objects.get(id=user_id)
-#         except User.DoesNotExist:
-#             return Response(status=status.HTTP_404_NOT_FOUND)
-#
-#         serializer = UpdatePasswordSerializer(data=request.data)
-#         serializer.is_valid(raise_exception=True)
-#
-#         # 把密码字段移除，不能直接明文保存密码
-#         del serializer.validated_data['password2']
-#         del serializer.validated_data['access_token']
-#         password = serializer.validated_data.pop('password')
-#         user.set_password(password)
-#         user.save()
-#
-#         return Response({'message': 'ok'})
+
+
+class UsernameInputView(GenericAPIView):
+    """忘记密码第一步"""
+
+    # 图片验证
+    serializer_class = ImageCodeCheckSerializer
+
+    def get(self, request, username):
+
+        user = get_user_by_account(username)
+
+        mobile = user.mobile
+        mobile = re.sub(mobile[3:7], '*'*4, mobile)
+
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER  # 引用jwt中的叫jwt_payload_handler函数(生成payload)
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER  # 函数引用  生成jwt
+
+        payload = jwt_payload_handler(user)  # 根据user生成用户相关的载荷
+        token = jwt_encode_handler(payload)  # 传入载荷生成完整的jwt
+
+        data = {
+            'mobile': mobile,
+            'access_token': token
+        }
+
+        return Response(data)
+
+
+class VerifyIdentityView(GenericAPIView):
+    """忘记密码第二步"""
+
+    def get(self, request, username):
+        user = get_user_by_account(username)
+
+        mobile = user.mobile
+
+        # 校验验证码
+        redis_conn = get_redis_connection('verify_codes')
+
+        real_sms_code = redis_conn.get('sms_%s' % mobile)
+
+        if real_sms_code is None:
+            return Response({'message': '无效的验证码'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 向redis存储数据时都是以字符串进行存储的,取出来后都是bytes类型 [bytes]
+        if real_sms_code.decode() != request.query_params.get('sms_code'):
+            return Response({'message': '验证码错误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER  # 引用jwt中的叫jwt_payload_handler函数(生成payload)
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER  # 函数引用  生成jwt
+
+        payload = jwt_payload_handler(user)  # 根据user生成用户相关的载荷
+        token = jwt_encode_handler(payload)  # 传入载荷生成完整的jwt
+
+        data = {
+            'user_id': user.id,
+            'access_token': token
+        }
+
+        return Response(data)
+
+
+class SetPasswordView(APIView):
+    """忘记密码第三步"""
+    def post(self, request, user_id):
+        user = User.objects.get(id=user_id)
+        serializer = SetPasswordSerializer(instance=user, data=request.data)
+        serializer.is_valid()
+        serializer.save()
+
+        return Response({'message': 'ok'})
