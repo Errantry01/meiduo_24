@@ -8,9 +8,11 @@ from rest_framework_jwt.settings import api_settings
 
 from .models import OAuthQQUser
 from .utils import generate_save_user_token
-from .serializers import QQAuthUserSerializer
+from .serializers import QQAuthUserSerializer, SinaAuthUserSerializer
 import logging
 from carts.utils import merge_cart_cookie_to_redis
+from .weibo import APIClient
+from .models import OAuthSinaUser
 
 logger = logging.getLogger('django')
 
@@ -61,7 +63,6 @@ class QQAuthUserView(APIView):
             logger.info(e)
             return Response({'message': 'QQ服务器不可用'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-
         try:
             # 5.查询数据库有没有这个openid
             authQQUserModel = OAuthQQUser.objects.get(openid=openid)
@@ -87,7 +88,6 @@ class QQAuthUserView(APIView):
             })
             # 在此调用合并购物车函数
             merge_cart_cookie_to_redis(request, user, response)
-
 
             return response
 
@@ -118,3 +118,86 @@ class QQAuthUserView(APIView):
         return response
 
 
+class SinaURLView(APIView):
+    """sina  login link"""
+
+    def get(self, request):
+        next = request.query_params.get('next', '/')
+
+        # # 微博登录参数
+        # APP_KEY = '1016842058'  # app key
+        # APP_SECRET = 'bc01ffd6a0b5a4c1228ff55bdb491294'  # app secret
+        # CALLBACK_URL = 'http://www.meiduo.site:8080/oauth_callback.html'  # callback url
+
+        # https://api.weibo.com/oauth2/authorize
+        # // 请求
+        # https://api.weibo.com/oauth2/authorize?client_id = 123050457758183 & redirect_uri = http: // www.example.com / response & response_type = code
+        # // 同意授权后会重定向
+        # http://www.example.com/response&code=CODE
+
+        # clinet对象
+        client = APIClient(app_key=settings.APP_KEY, app_secret=settings.APP_SECRET, redirect_uri=settings.CALLBACK_URL,
+                           domain='api.weibo.com', version='2', state=next)
+
+        # 拼接login_url
+        login_url = client.get_authorize_url()
+
+        return Response({'login_url': login_url})
+
+
+class SinaOauthUserView(APIView):
+    """sian登录后的回调处理"""
+
+    def get(self, request):
+        # 获取前端传入的code
+        code = request.query_params.get('code')
+        if not code:
+            return Response({'message': '缺少code'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 创建sina登录对象
+        client = APIClient(app_key=settings.APP_KEY, app_secret=settings.APP_SECRET,
+                           redirect_uri=settings.CALLBACK_URL, )
+
+        # https://api.weibo.com/oauth2/access_token?client_id=YOUR_CLIENT_ID&client_secret=YOUR_CLIENT_SECRET&grant_type=authorization_code&redirect_uri=YOUR_REGISTERED_REDIRECT_URI&code=CODE
+        r = client.request_access_token(code)
+
+        # access_token = r.access_token
+        # expires_in = r.expires_in
+        # client.set_access_token(access_token, expires_in)
+        access_token = r.get('access_token')
+
+        try:
+            sina_user = OAuthSinaUser.objects.get(access_token=access_token)
+        except OAuthSinaUser.DoesNotExist:
+            return Response({'access_token': access_token})
+
+        user = sina_user.user
+        user_id = user.id
+        user_name = user.username
+
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER  # 引用jwt中的叫jwt_payload_handler函数(生成payload)
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER  # 函数引用 生成jwt
+
+        payload = jwt_payload_handler(user)  # 根据user生成用户相关的载荷
+        token = jwt_encode_handler(payload)  # 传入载荷生成完整的jwt
+        data = {
+            'token': token,
+            'username': user_name,
+            'user_id': user_id
+        }
+
+        return Response(data)
+
+    def post(self, request):
+        serializer = SinaAuthUserSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        jwt_payload_handler = api_settings.JWT_PAYLOAD_HANDLER  # 引用jwt中的叫jwt_payload_handler函数(生成payload)
+        jwt_encode_handler = api_settings.JWT_ENCODE_HANDLER  # 函数引用 生成jwt
+
+        payload = jwt_payload_handler(user)  # 根据user生成用户相关的载荷
+        token = jwt_encode_handler(payload)  # 传入载荷生成完整的jwt
+
+        return Response({'token': token,
+                         'username': user.username,
+                         'user_id': user.id})
