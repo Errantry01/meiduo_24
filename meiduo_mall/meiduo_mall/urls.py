@@ -27,7 +27,9 @@ urlpatterns = [
 
     url(r'^', include('users.urls')),  # 用户模块
 
-    url(r'^oauth/', include('oauth.urls')),  # QQ模块
+    url(r'^oauth/', include('oauth.urls')),  # QQ模块 $ sina 模块
+
+    # url(r'^oauth/', include('oauth.urls')),  #sina模块
 
     url(r'^', include('areas.urls')),  # 省市区模块
 
