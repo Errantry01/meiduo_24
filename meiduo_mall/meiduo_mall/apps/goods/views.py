@@ -1,10 +1,15 @@
 from django.shortcuts import render
 from drf_haystack.viewsets import HaystackViewSet
+from rest_framework import status
 from rest_framework.generics import ListAPIView
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from orders.models import OrderGoods
 from .models import SKU
 from .serializers import SKUSerializer, SKUSearchSerializer
 from rest_framework.filters import OrderingFilter
+from orders.serializers import SKUCommentSerializer
 
 
 # Create your views here.
@@ -31,3 +36,15 @@ class SKUSearchViewSet(HaystackViewSet):
     index_models = [SKU]  # 指定查询集
 
     serializer_class = SKUSearchSerializer  # 指定序列化器
+
+
+class SKUCommentView(APIView):
+    """商品评论展示"""
+    def get(self, request, sku_id):
+
+        order_good = OrderGoods.objects.filter(sku_id=sku_id,is_commented =1)
+        serializer = SKUCommentSerializer(data=order_good, many=True)
+        serializer.is_valid(raise_exception=True)
+        return Response(data=serializer.data, status=status.HTTP_200_OK)
+
+
