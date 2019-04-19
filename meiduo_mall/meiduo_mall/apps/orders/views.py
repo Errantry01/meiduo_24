@@ -109,14 +109,12 @@ class CommentOrderView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, order_id):
-
         # 获取订单商品
         sku_id = request.data['sku']
         try:
             order_good = OrderGoods.objects.get(order_id=order_id, is_commented=False, sku_id=sku_id)
         except OrderGoods.DoesNotExist:
-            return Response({'message': '订单信息有误'}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response({'message' : '商品错误'}, status=status.HTTP_400_BAD_REQUEST)
         # 创建序列化器反序列化
         serializer = CommentOrderSerializer(instance=order_good, data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -130,8 +128,10 @@ class CommentOrderView(APIView):
         order_good.is_commented = 1
         order_good.save()
 
-        # 更新保存订单状态
-        order = order_good.order
-        order.status = OrderInfo.ORDER_STATUS_ENUM['FINISHED']
-        order.save()
+        order_goods = OrderGoods.objects.filter(order_id=order_id, is_commented=False)
+        if len(order_goods) == 0:
+            order = OrderInfo.objects.get(order_id=order_id)
+            order.status = OrderInfo.ORDER_STATUS_ENUM['FINISHED']
+            order.save()
+
         return Response({'message': 'ok'}, status=status.HTTP_201_CREATED)
