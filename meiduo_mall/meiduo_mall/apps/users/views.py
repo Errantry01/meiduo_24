@@ -13,7 +13,7 @@ from rest_framework_jwt.views import ObtainJSONWebToken
 from datetime import datetime
 
 from .serializers import CreateUserSerializer, UserDetailSerializer, EmailSerializer, UserAddressSerializer, \
-    AddressTitleSerializer, UserBrowserHistorySerializer, SKUSerializer, UpdatePasswordSerializer
+    AddressTitleSerializer, UserBrowserHistorySerializer, SKUSerializer
 from .models import User, Address
 from goods.models import SKU
 from carts.utils import merge_cart_cookie_to_redis
@@ -240,23 +240,23 @@ class UserAuthorizeView(ObtainJSONWebToken):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class ResetPassword(APIView):
-    """重置密码"""
-    def post(self, request, user_id):
-        # 根据user_id获取user对象
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-
-        serializer = UpdatePasswordSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        # 把密码字段移除，不能直接明文保存密码
-        del serializer.validated_data['password2']
-        del serializer.validated_data['access_token']
-        password = serializer.validated_data.pop('password')
-        user.set_password(password)
-        user.save()
-
-        return Response({'message': 'ok'})
+# class ResetPassword(APIView):
+#     """重置密码"""
+#     def post(self, request, user_id):
+#         # 根据user_id获取user对象
+#         try:
+#             user = User.objects.get(id=user_id)
+#         except User.DoesNotExist:
+#             return Response(status=status.HTTP_404_NOT_FOUND)
+#
+#         serializer = UpdatePasswordSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#
+#         # 把密码字段移除，不能直接明文保存密码
+#         del serializer.validated_data['password2']
+#         del serializer.validated_data['access_token']
+#         password = serializer.validated_data.pop('password')
+#         user.set_password(password)
+#         user.save()
+#
+#         return Response({'message': 'ok'})
