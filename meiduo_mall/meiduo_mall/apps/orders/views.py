@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from rest_framework import status
 from rest_framework.views import APIView
 from django_redis import get_redis_connection
 from rest_framework.permissions import IsAuthenticated
@@ -7,8 +8,9 @@ from rest_framework.response import Response
 from rest_framework.generics import CreateAPIView, ListAPIView
 
 from goods.models import SKU
-from .serializers import OrderSettlementSerializer, CommitOrderSerializer, OrderInfoSerializer
-from .models import OrderInfo
+from orders.models import OrderGoods, OrderInfo
+from .serializers import OrderSettlementSerializer, CommitOrderSerializer, UnCommentOrderSerializer, CommentOrderSerializer, OrderInfoSerializer
+
 
 
 # Create your views here.
@@ -73,3 +75,64 @@ class CommitOrderView(CreateAPIView, ListAPIView):
             return CommitOrderSerializer
         else:
             return OrderInfoSerializer
+
+
+class UnCommentOrderView(APIView):
+    """待评论订单商品展示"""
+    permission_classes = [IsAuthenticated]
+
+
+    def get(self, request, order_id):
+
+        user = request.user
+        username = user.username
+
+        try:
+            order = OrderInfo.objects.filter(order_id=order_id, user=user, status=OrderInfo.ORDER_STATUS_ENUM["UNCOMMENT"])
+        except OrderInfo.DoesNotExist:
+            return Response({'message':'订单信息有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+        order_goods = OrderGoods.objects.filter(is_commented=False, order=order)
+
+        skus = []
+        for order_good in order_goods:
+            sku = order_good.sku
+            skus.append(sku)
+
+        # 创建序列化器进行序列化
+        serializer = UnCommentOrderSerializer(data=skus, many=True)
+        serializer.is_valid(raise_exception=True)
+        return Response(data=serializer.data)
+
+class CommentOrderView(APIView):
+    """评论"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, order_id):
+
+        # 获取订单商品
+        sku_id = request.data['sku']
+        try:
+            order_good = OrderGoods.objects.get(order_id=order_id, is_commented=False, sku_id=sku_id)
+        except OrderGoods.DoesNotExist:
+            return Response({'message':'订单信息有误'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 创建序列化器反序列化
+        serializer = CommentOrderSerializer(instance=order_good,data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.data
+
+        # 更新模型
+        order_good.comment = data['comment']
+        order_good.score = data['score']
+        order_good.is_anonymous = data['is_anonymous']
+        order_good.sku_id = data['sku']
+        order_good.is_comment = 1
+        order_good.save()
+
+        # 更新保存订单状态
+        order = order_good.order
+        order.status = OrderInfo.ORDER_STATUS_ENUM['FINISHED']
+        order.save()
+        return Response({'message': 'ok'}, status=status.HTTP_201_CREATED)
