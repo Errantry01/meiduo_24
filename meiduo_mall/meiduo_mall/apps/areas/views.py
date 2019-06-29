@@ -10,6 +10,9 @@ from rest_framework_extensions.cache.mixins import CacheResponseMixin
 from .models import Area
 from .serializers import AreaSerializer, SubsSerializer
 
+from .models import Area
+from .serializers import AreaSerializer, SubsSerializer
+
 
 # Create your views here.
 # class AreaListView(APIView):
